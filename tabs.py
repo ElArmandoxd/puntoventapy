@@ -1,6 +1,34 @@
 from appJar import gui
 import sqlite3
 
+def registrarVenta():
+    producto_venta = app.getOptionBox("Productos")
+    cantidad_venta = int(app.getEntry("cantidades"))
+    indice = productos.index(producto_venta)
+    restantes = int(cantidades[indice])
+    if restantes >= cantidad_venta:
+        precio_venta = float(precios[indice]) * cantidad_venta
+        cantidad_restante = restantes - cantidad_venta
+        app.addLabel("total", "Total: " + str(precio_venta))
+        conn = sqlite3.connect("almacen.db")
+        cursor_venta = conn.cursor()
+        tabla_venta = """CREATE TABLE IF NOT EXISTS ventas(
+            producto TEXT NOT NULL,
+            precio REAL NOT NULL,
+            cantidad INT NOT NULL
+        );"""
+        cursor_venta.execute(tabla_venta)
+        reg_venta = (producto_venta, precio_venta, cantidad_venta)
+        cursor_venta.execute("INSERT INTO ventas VALUES(?,?,?)", reg_venta)
+        cursor_venta.execute("UPDATE almacen SET cantidad = ? WHERE producto = ?",(cantidad_restante, producto_venta))
+        conn.commit()
+        conn.close()
+        app.refreshDbTable("tabladb")
+        app.refreshDbTable("tablaventas")
+        app.infoBox("Exito","Venta exitosa")
+    else:
+        app.errorBox("No hay suficientes","No hay suficientes objetos en existencia, prueba con una cantidad menor")
+
 def salir():
     app.stop()
 
@@ -30,6 +58,7 @@ def guardar():
     conn.commit()
     conn.close()
     app.refreshDbTable("tabladb")
+    app.infoBox("Exito","Producto registrado")
 
 with gui("Punto de venta") as app:
     with app.tabbedFrame("Address Book"):
@@ -56,7 +85,19 @@ with gui("Punto de venta") as app:
         with app.tab('Venta'):
 
             app.addLabel("Venta","Venta productos")
-            app.addLabel("titulo_venta", "Vender productos")
-            app.addDbTable("tablaventa", "almacen.db", "almacen")
-            app.addButton("Salir...", salir)
-            
+
+            conn = sqlite3.connect("almacen.db")
+            conn.row_factory = lambda cursor, row: row[0]
+            cursor = conn.cursor()
+            productos = cursor.execute('SELECT producto FROM almacen').fetchall()
+            precios = cursor.execute('SELECT precio FROM almacen').fetchall()
+            cantidades = cursor.execute('SELECT cantidad FROM almacen').fetchall()
+            conn.close()
+            app.addLabelOptionBox("Productos", productos)
+            app.addLabelEntry("cantidades", label = "Cantidad: ")
+            app.addButton("Vender", registrarVenta)
+
+        with app.tab('Reporte venta'):
+            app.addLabel("titulo_ver_reporte", "Ver reporte ventas")
+            app.addDbTable("tablaventas", "almacen.db", "ventas")
+    
